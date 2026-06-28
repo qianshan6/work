@@ -69,10 +69,11 @@
         .btn-small.danger { background: #fd79a8; color: white; }
         .btn-small.success { background: #00b894; color: white; }
         .btn-small.warning { background: #fdcb6e; color: #2d3436; }
+        .btn-small.purple { background: #a29bfe; color: white; }
         
         .student-list {
             background: #f8f9fa; border-radius: 12px; padding: 10px;
-            margin-bottom: 12px; max-height: 220px; overflow-y: auto;
+            margin-bottom: 12px; max-height: 200px; overflow-y: auto;
         }
         .student-item {
             display: flex; justify-content: space-between; align-items: center;
@@ -92,10 +93,6 @@
         .student-item .delete-btn {
             background: none; border: none; color: #e17055;
             font-size: 18px; cursor: pointer; padding: 0 4px;
-        }
-        .student-item .edit-btn {
-            background: none; border: none; color: #667eea;
-            font-size: 14px; cursor: pointer; padding: 0 4px;
         }
         
         .history-box {
@@ -182,6 +179,54 @@
         }
         .class-selector select:focus { outline: none; }
         
+        .import-area {
+            border: 2px dashed #dfe6e9;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            color: #b2bec3;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 12px;
+        }
+        .import-area:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+        .import-area input {
+            display: none;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 2000;
+            opacity: 0;
+            transition: all 0.3s;
+            max-width: 90%;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+        .toast.success {
+            background: #00b894;
+            color: white;
+        }
+        .toast.error {
+            background: #e17055;
+            color: white;
+        }
+        .toast.info {
+            background: #2d3436;
+            color: white;
+        }
+        
         @media (max-width: 480px) {
             .result-box .result-text { font-size: 26px; }
             .header h1 { font-size: 20px; }
@@ -193,7 +238,7 @@
     <div class="container" id="app">
         <div class="header">
             <h1>🎰 课堂随机抽奖器</h1>
-            <div class="subtitle">📚 多班级管理 · 权重抽奖 · 批量导入</div>
+            <div class="subtitle">📚 多班级管理 · 权重抽奖 · 数据导入导出</div>
         </div>
         
         <!-- 抽奖结果 -->
@@ -240,6 +285,18 @@
                 <button class="btn-small danger" onclick="clearAll()">🗑️ 清空</button>
             </div>
             
+            <!-- 导入导出区域 -->
+            <div class="btn-group">
+                <button class="btn-small success" onclick="exportData()">💾 导出数据</button>
+                <label class="btn-small purple" style="cursor:pointer;" onclick="document.getElementById('importFile').click()">
+                    📂 导入数据
+                    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" />
+                </label>
+            </div>
+            <p style="font-size:11px; color:#b2bec3; text-align:center; margin:4px 0 8px 0;">
+                💡 导出 JSON 文件保存到手机/云盘，换设备时导入即可
+            </p>
+            
             <div class="student-list" id="studentList">
                 <div class="empty-tip">暂无学生，请添加</div>
             </div>
@@ -257,6 +314,9 @@
             </div>
         </div>
     </div>
+    
+    <!-- Toast 通知 -->
+    <div class="toast" id="toast"></div>
     
     <!-- 班级管理弹窗 -->
     <div class="modal-overlay" id="classModal">
@@ -308,7 +368,18 @@
         let normalWeight = 1;
         let history = [];
         let isRunning = false;
-        let editingStudent = null;  // 当前正在修改权重的学生
+        let editingStudent = null;
+        
+        // ========== Toast 通知 ==========
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
         
         // ========== 存储 ==========
         function loadData() {
@@ -360,6 +431,60 @@
             saveAllData();
         }
         
+        // ========== 数据导入导出（核心功能） ==========
+        function exportData() {
+            const data = JSON.stringify(allClasses, null, 2);
+            const blob = new Blob([data], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const dateStr = new Date().toLocaleDateString().replace(/\//g, '-');
+            a.href = url;
+            a.download = `班级数据_${dateStr}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('✅ 数据导出成功！', 'success');
+        }
+        
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+                        throw new Error('数据格式错误');
+                    }
+                    
+                    // 验证数据格式
+                    for (const className of Object.keys(data)) {
+                        if (!data[className].students || !Array.isArray(data[className].students)) {
+                            throw new Error('数据格式错误：缺少 students 字段');
+                        }
+                    }
+                    
+                    if (!confirm('⚠️ 确定要导入数据吗？\n当前所有数据将被覆盖！\n\n导入后将包含：' + Object.keys(data).length + ' 个班级')) {
+                        return;
+                    }
+                    
+                    allClasses = data;
+                    currentClass = Object.keys(allClasses)[0];
+                    loadCurrentClass();
+                    saveAllData();
+                    renderAll();
+                    renderClassSelect();
+                    showToast('✅ 数据导入成功！共 ' + Object.keys(allClasses).length + ' 个班级', 'success');
+                } catch(err) {
+                    showToast('❌ 数据格式错误，导入失败', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+        
         // ========== 班级管理 ==========
         function renderClassSelect() {
             const select = document.getElementById('classSelect');
@@ -391,8 +516,8 @@
         
         function createClass() {
             const name = document.getElementById('newClassName').value.trim();
-            if (!name) { alert('请输入班级名称'); return; }
-            if (allClasses[name]) { alert('班级已存在'); return; }
+            if (!name) { showToast('请输入班级名称', 'error'); return; }
+            if (allClasses[name]) { showToast('班级已存在', 'error'); return; }
             
             allClasses[name] = { students: [], highProb: {}, history: [] };
             currentClass = name;
@@ -403,11 +528,12 @@
             renderClassSelect();
             renderAll();
             closeClassModal();
+            showToast('✅ 已创建班级：' + name, 'success');
         }
         
         function deleteClass() {
             if (Object.keys(allClasses).length <= 1) {
-                alert('至少保留一个班级');
+                showToast('至少保留一个班级', 'error');
                 return;
             }
             if (!confirm(`确定删除 "${currentClass}" 吗？`)) return;
@@ -418,6 +544,7 @@
             saveAllData();
             renderClassSelect();
             renderAll();
+            showToast('已删除班级', 'info');
         }
         
         // ========== 学生管理 ==========
@@ -431,9 +558,9 @@
             const name = nameInput.value.trim();
             const weight = parseInt(weightInput.value) || 1;
             
-            if (!name) { alert('请输入学生姓名'); return; }
-            if (students.includes(name)) { alert(`"${name}" 已存在`); return; }
-            if (weight < 1) { alert('权重必须 ≥ 1'); return; }
+            if (!name) { showToast('请输入学生姓名', 'error'); return; }
+            if (students.includes(name)) { showToast(`"${name}" 已存在`, 'error'); return; }
+            if (weight < 1) { showToast('权重必须 ≥ 1', 'error'); return; }
             
             students.push(name);
             if (weight > normalWeight) highProb[name] = weight;
@@ -442,6 +569,7 @@
             weightInput.value = '1';
             saveCurrentClass();
             renderAll();
+            showToast(`✅ 已添加：${name}（权重：${weight}）`, 'success');
         }
         
         function deleteStudent(name) {
@@ -452,7 +580,6 @@
             renderAll();
         }
         
-        // ========== 修改权重（新增功能） ==========
         function showWeightModal(name) {
             editingStudent = name;
             const currentWeight = getWeight(name);
@@ -472,7 +599,7 @@
             if (!editingStudent) return;
             const newWeight = parseInt(document.getElementById('newWeightInput').value);
             if (isNaN(newWeight) || newWeight < 1) {
-                alert('权重必须 ≥ 1');
+                showToast('权重必须 ≥ 1', 'error');
                 return;
             }
             
@@ -485,6 +612,7 @@
             saveCurrentClass();
             renderAll();
             closeWeightModal();
+            showToast(`✅ 已更新 "${editingStudent}" 的权重为 ${newWeight}`, 'success');
         }
         
         function resetWeights() {
@@ -492,6 +620,7 @@
             highProb = {};
             saveCurrentClass();
             renderAll();
+            showToast('所有权重已重置为 1', 'info');
         }
         
         function clearAll() {
@@ -509,6 +638,7 @@
             history = [];
             saveCurrentClass();
             renderAll();
+            showToast('已加载示例数据', 'info');
         }
         
         // ========== 批量导入 ==========
@@ -523,7 +653,7 @@
         
         function batchImport() {
             const text = document.getElementById('batchInput').value.trim();
-            if (!text) { alert('请输入学生数据'); return; }
+            if (!text) { showToast('请输入学生数据', 'error'); return; }
             
             let count = 0;
             const lines = text.split('\n');
@@ -541,14 +671,14 @@
             closeBatchImport();
             saveCurrentClass();
             renderAll();
-            alert(`成功导入 ${count} 名学生`);
+            showToast(`✅ 成功导入 ${count} 名学生`, 'success');
         }
         
         // ========== 抽奖 ==========
         function startLottery() {
             if (isRunning) return;
             if (students.length === 0) {
-                alert('学生列表为空！');
+                showToast('学生列表为空！', 'error');
                 return;
             }
             
@@ -661,7 +791,6 @@
             if (e.key === 'Enter') addStudent();
         });
         
-        // 权重弹窗回车确认
         document.getElementById('newWeightInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') confirmWeightChange();
         });
