@@ -72,7 +72,7 @@
         
         .student-list {
             background: #f8f9fa; border-radius: 12px; padding: 10px;
-            margin-bottom: 12px; max-height: 180px; overflow-y: auto;
+            margin-bottom: 12px; max-height: 220px; overflow-y: auto;
         }
         .student-item {
             display: flex; justify-content: space-between; align-items: center;
@@ -83,10 +83,19 @@
         .student-item .weight {
             font-size: 12px; color: #636e72; background: #dfe6e9;
             padding: 2px 10px; border-radius: 12px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .student-item .weight:hover { background: #667eea; color: white; }
+        .student-item .actions {
+            display: flex; gap: 4px; align-items: center;
         }
         .student-item .delete-btn {
             background: none; border: none; color: #e17055;
             font-size: 18px; cursor: pointer; padding: 0 4px;
+        }
+        .student-item .edit-btn {
+            background: none; border: none; color: #667eea;
+            font-size: 14px; cursor: pointer; padding: 0 4px;
         }
         
         .history-box {
@@ -121,18 +130,25 @@
         .modal-overlay.active { display: flex; }
         .modal {
             background: white; border-radius: 16px; padding: 24px;
-            max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto;
+            max-width: 360px; width: 100%; max-height: 80vh; overflow-y: auto;
         }
         .modal h3 { margin-bottom: 12px; color: #2d3436; }
+        .modal label { font-size: 14px; color: #2d3436; display: block; margin-bottom: 4px; }
+        .modal input {
+            width: 100%; padding: 10px 12px; border: 2px solid #dfe6e9;
+            border-radius: 10px; font-size: 16px;
+        }
+        .modal input:focus { outline: none; border-color: #667eea; }
+        .modal .modal-btns {
+            display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end;
+        }
+        .modal .modal-btns .btn-small { padding: 10px 24px; }
         .modal textarea {
             width: 100%; height: 160px; padding: 10px;
             border: 2px solid #dfe6e9; border-radius: 10px;
             font-size: 14px; font-family: monospace; resize: vertical;
         }
         .modal textarea:focus { outline: none; border-color: #667eea; }
-        .modal .modal-btns {
-            display: flex; gap: 10px; margin-top: 12px; justify-content: flex-end;
-        }
         .modal .class-input {
             display: flex; gap: 8px; margin-bottom: 12px;
         }
@@ -227,6 +243,7 @@
             <div class="student-list" id="studentList">
                 <div class="empty-tip">暂无学生，请添加</div>
             </div>
+            <p style="font-size:11px; color:#b2bec3; text-align:center; margin-top:4px;">💡 点击权重数字可修改</p>
         </div>
         
         <!-- 历史记录 Tab -->
@@ -255,6 +272,19 @@
         </div>
     </div>
     
+    <!-- 修改权重弹窗 -->
+    <div class="modal-overlay" id="weightModal">
+        <div class="modal">
+            <h3>✏️ 修改权重</h3>
+            <label id="weightStudentName" style="font-size:16px; color:#2d3436; margin-bottom:8px;"></label>
+            <input type="number" id="newWeightInput" value="1" min="1" />
+            <div class="modal-btns">
+                <button class="btn-small" onclick="closeWeightModal()">取消</button>
+                <button class="btn-small primary" onclick="confirmWeightChange()">确认修改</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- 批量导入弹窗 -->
     <div class="modal-overlay" id="batchModal">
         <div class="modal">
@@ -271,13 +301,14 @@
 
     <script>
         // ========== 数据 ==========
-        let allClasses = {};  // { 班级名: { students: [], highProb: {}, history: [] } }
+        let allClasses = {};
         let currentClass = '默认班级';
         let students = [];
         let highProb = {};
         let normalWeight = 1;
         let history = [];
         let isRunning = false;
+        let editingStudent = null;  // 当前正在修改权重的学生
         
         // ========== 存储 ==========
         function loadData() {
@@ -342,9 +373,7 @@
             const newClass = select.value;
             if (newClass === currentClass) return;
             
-            // 保存当前班级
             saveCurrentClass();
-            
             currentClass = newClass;
             loadCurrentClass();
             renderAll();
@@ -421,6 +450,41 @@
             delete highProb[name];
             saveCurrentClass();
             renderAll();
+        }
+        
+        // ========== 修改权重（新增功能） ==========
+        function showWeightModal(name) {
+            editingStudent = name;
+            const currentWeight = getWeight(name);
+            document.getElementById('weightStudentName').textContent = `修改 "${name}" 的权重`;
+            document.getElementById('newWeightInput').value = currentWeight;
+            document.getElementById('weightModal').classList.add('active');
+            document.getElementById('newWeightInput').focus();
+            document.getElementById('newWeightInput').select();
+        }
+        
+        function closeWeightModal() {
+            document.getElementById('weightModal').classList.remove('active');
+            editingStudent = null;
+        }
+        
+        function confirmWeightChange() {
+            if (!editingStudent) return;
+            const newWeight = parseInt(document.getElementById('newWeightInput').value);
+            if (isNaN(newWeight) || newWeight < 1) {
+                alert('权重必须 ≥ 1');
+                return;
+            }
+            
+            if (newWeight > normalWeight) {
+                highProb[editingStudent] = newWeight;
+            } else {
+                delete highProb[editingStudent];
+            }
+            
+            saveCurrentClass();
+            renderAll();
+            closeWeightModal();
         }
         
         function resetWeights() {
@@ -547,8 +611,8 @@
             container.innerHTML = students.map(name => `
                 <div class="student-item">
                     <span class="name">${name}</span>
-                    <div>
-                        <span class="weight">⚖️ ${getWeight(name)}</span>
+                    <div class="actions">
+                        <span class="weight" onclick="showWeightModal('${name}')">⚖️ ${getWeight(name)}</span>
                         <button class="delete-btn" onclick="deleteStudent('${name}')">×</button>
                     </div>
                 </div>
@@ -597,11 +661,19 @@
             if (e.key === 'Enter') addStudent();
         });
         
+        // 权重弹窗回车确认
+        document.getElementById('newWeightInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') confirmWeightChange();
+        });
+        
         document.getElementById('batchModal').addEventListener('click', function(e) {
             if (e.target === this) closeBatchImport();
         });
         document.getElementById('classModal').addEventListener('click', function(e) {
             if (e.target === this) closeClassModal();
+        });
+        document.getElementById('weightModal').addEventListener('click', function(e) {
+            if (e.target === this) closeWeightModal();
         });
         
         // ========== 启动 ==========
