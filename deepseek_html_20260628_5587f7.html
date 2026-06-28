@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎰 课堂随机抽奖器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        
+        .container {
+            max-width: 480px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            color: #2d3436;
+            margin-bottom: 4px;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            color: #636e72;
+        }
+        
+        .result-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .result-box .result-text {
+            font-size: 36px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-height: 50px;
+            transition: all 0.3s;
+        }
+        
+        .result-box .count-info {
+            font-size: 14px;
+            color: rgba(255,255,255,0.8);
+            margin-top: 8px;
+        }
+        
+        .btn-lottery {
+            width: 100%;
+            padding: 16px;
+            font-size: 22px;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-lottery:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-lottery:disabled {
+            opacity: 0.6;
+            transform: scale(0.98);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .controls input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 2px solid #dfe6e9;
+            border-radius: 10px;
+            font-size: 14px;
+            min-width: 80px;
+        }
+        
+        .controls input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn-small {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #dfe6e9;
+            color: #2d3436;
+        }
+        
+        .btn-small:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-small.primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-small.danger {
+            background: #fd79a8;
+            color: white;
+        }
+        
+        .btn-small.success {
+            background: #00b894;
+            color: white;
+        }
+        
+        .student-list {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .student-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .student-item:last-child {
+            border-bottom: none;
+        }
+        
+        .student-item .name {
+            font-size: 15px;
+            font-weight: 500;
+        }
+        
+        .student-item .weight {
+            font-size: 12px;
+            color: #636e72;
+            background: #dfe6e9;
+            padding: 2px 10px;
+            border-radius: 12px;
+        }
+        
+        .student-item .delete-btn {
+            background: none;
+            border: none;
+            color: #e17055;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        
+        .history-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            padding: 6px 8px;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            color: #2d3436;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-item .time {
+            color: #b2bec3;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+        
+        .empty-tip {
+            color: #b2bec3;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 14px;
+        }
+        
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .speed-control label {
+            font-size: 14px;
+            color: #2d3436;
+            font-weight: 500;
+        }
+        
+        .speed-control input[type="range"] {
+            flex: 1;
+            accent-color: #667eea;
+        }
+        
+        .speed-control .speed-label {
+            font-size: 14px;
+            color: #636e72;
+            min-width: 50px;
+        }
+        
+        @media (max-width: 480px) {
+            .result-box .result-text {
+                font-size: 28px;
+            }
+            
+            .header h1 {
+                font-size: 22px;
+            }
+            
+            .controls input {
+                font-size: 12px;
+                padding: 8px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <div class="header">
+            <h1>🎰 课堂随机抽奖器</h1>
+            <div class="subtitle">📚 支持权重抽奖 · 自动保存</div>
+        </div>
+        
+        <!-- 抽奖结果 -->
+        <div class="result-box">
+            <div class="result-text" id="resultText">🎯 准备抽奖</div>
+            <div class="count-info" id="countInfo">参与人数：0 人</div>
+        </div>
+        
+        <!-- 抽奖按钮 -->
+        <button class="btn-lottery" id="lotteryBtn" onclick="startLottery()">🎯 开始抽奖</button>
+        
+        <!-- 速度控制 -->
+        <div class="speed-control">
+            <label>⚡ 速度</label>
+            <input type="range" id="speedRange" min="20" max="200" value="80">
+            <span class="speed-label" id="speedLabel">80ms</span>
+        </div>
+        
+        <!-- 学生管理 -->
+        <div class="controls">
+            <input type="text" id="studentName" placeholder="👤 学生姓名" />
+            <input type="number" id="studentWeight" placeholder="⚖️ 权重" value="1" min="1" style="max-width:80px;" />
+            <button class="btn-small primary" onclick="addStudent()">➕ 添加</button>
+        </div>
+        
+        <!-- 学生列表 -->
+        <div class="student-list" id="studentList">
+            <div class="empty-tip">暂无学生，请添加</div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+            <button class="btn-small danger" onclick="resetWeights()">📊 重置权重</button>
+            <button class="btn-small" onclick="clearAll()">🗑️ 清空全部</button>
+            <button class="btn-small" onclick="loadSampleData()">📂 示例数据</button>
+        </div>
+        
+        <!-- 历史记录 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:bold; font-size:15px;">📝 历史记录</span>
+            <button class="btn-small" onclick="clearHistory()" style="padding:4px 12px; font-size:12px;">清空</button>
+        </div>
+        <div class="history-box" id="historyList">
+            <div class="empty-tip">暂无记录</div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 数据管理 ==========
+        let students = [];
+        let highProb = {};
+        let normalWeight = 1;
+        let history = [];
+        let isRunning = false;
+        
+        // 从 localStorage 加载数据
+        function loadData() {
+            try {
+                const saved = localStorage.getItem('lotteryData');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    students = data.students || [];
+                    highProb = data.highProb || {};
+                    normalWeight = data.normalWeight || 1;
+                    history = data.history || [];
+                }
+            } catch (e) {
+                console.warn('加载数据失败，使用默认数据');
+            }
+            renderAll();
+        }
+        
+        // 保存数据到 localStorage
+        function saveData() {
+            try {
+                localStorage.setItem('lotteryData', JSON.stringify({
+                    students: students,
+                    highProb: highProb,
+                    normalWeight: normalWeight,
+                    history: history
+                }));
+            } catch (e) {
+                console.warn('保存数据失败');
+            }
+        }
+        
+        // ========== 核心功能 ==========
+        function getWeight(name) {
+            return highProb[name] || normalWeight;
+        }
+        
+        function addStudent() {
+            const nameInput = document.getElementById('studentName');
+            const weightInput = document.getElementById('studentWeight');
+            const name = nameInput.value.trim();
+            const weight = parseInt(weightInput.value) || 1;
+            
+            if (!name) {
+                alert('请输入学生姓名');
+                return;
+            }
+            
+            if (students.includes(name)) {
+                alert(`学生 "${name}" 已存在`);
+                return;
+            }
+            
+            if (weight < 1) {
+                alert('权重必须大于等于 1');
+                return;
+            }
+            
+            students.push(name);
+            if (weight > normalWeight) {
+                highProb[name] = weight;
+            }
+            
+            nameInput.value = '';
+            weightInput.value = '1';
+            saveData();
+            renderAll();
+        }
+        
+        function deleteStudent(name) {
+            if (!confirm(`确定要删除 "${name}" 吗？`)) return;
+            students = students.filter(s => s !== name);
+            delete highProb[name];
+            saveData();
+            renderAll();
+        }
+        
+        function resetWeights() {
+            if (!confirm('确定要将所有权重重置为 1 吗？')) return;
+            highProb = {};
+            saveData();
+            renderAll();
+        }
+        
+        function clearAll() {
+            if (!confirm('确定要清空所有学生吗？')) return;
+            students = [];
+            highProb = {};
+            saveData();
+            renderAll();
+        }
+        
+        function loadSampleData() {
+            if (students.length > 0 && !confirm('当前已有数据，确定要替换为示例数据吗？')) return;
+            students = ['范留硕', '段硕', '黄廉体', '庹雅欣', '肖衔', '萧炎', '周健毅'];
+            highProb = {'肖衔': 100, '段硕': 100, '萧炎': 1000};
+            normalWeight = 1;
+            history = [];
+            saveData();
+            renderAll();
+        }
+        
+        // ========== 抽奖逻辑 ==========
+        function startLottery() {
+            if (isRunning) return;
+            if (students.length === 0) {
+                alert('学生列表为空，请先添加学生！');
+                return;
+            }
+            
+            isRunning = true;
+            const btn = document.getElementById('lotteryBtn');
+            btn.disabled = true;
+            btn.textContent = '🎰 抽奖中...';
+            
+            // 计算权重
+            const weights = students.map(s => getWeight(s));
+            
+            // 抽取中奖者
+            const totalWeight = weights.reduce((a, b) => a + b, 0);
+            let rand = Math.random() * totalWeight;
+            let winner = students[0];
+            for (let i = 0; i < weights.length; i++) {
+                rand -= weights[i];
+                if (rand <= 0) {
+                    winner = students[i];
+                    break;
+                }
+            }
+            
+            // 动画效果
+            const speed = parseInt(document.getElementById('speedRange').value);
+            const steps = 20;
+            let count = 0;
+            
+            const interval = setInterval(() => {
+                const randomName = students[Math.floor(Math.random() * students.length)];
+                document.getElementById('resultText').textContent = `🎉 ${randomName}`;
+                count++;
+                
+                if (count >= steps) {
+                    clearInterval(interval);
+                    document.getElementById('resultText').textContent = `🏆 ${winner} 🏆`;
+                    // 添加历史
+                    history.unshift(winner);
+                    if (history.length > 100) history = history.slice(0, 100);
+                    saveData();
+                    renderHistory();
+                    
+                    btn.disabled = false;
+                    btn.textContent = '🎯 开始抽奖';
+                    isRunning = false;
+                }
+            }, speed);
+        }
+        
+        // ========== 渲染 ==========
+        function renderStudentList() {
+            const container = document.getElementById('studentList');
+            if (students.length === 0) {
+                container.innerHTML = '<div class="empty-tip">暂无学生，请添加</div>';
+                return;
+            }
+            
+            container.innerHTML = students.map(name => `
+                <div class="student-item">
+                    <span class="name">${name}</span>
+                    <div>
+                        <span class="weight">⚖️ ${getWeight(name)}</span>
+                        <button class="delete-btn" onclick="deleteStudent('${name}')">×</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+            if (history.length === 0) {
+                container.innerHTML = '<div class="empty-tip">暂无记录</div>';
+                return;
+            }
+            
+            container.innerHTML = history.map((name, index) => {
+                const time = new Date().toLocaleTimeString();
+                return `<div class="history-item"><span class="time">#${index + 1}</span>🎯 ${name}</div>`;
+            }).join('');
+        }
+        
+        function renderCount() {
+            document.getElementById('countInfo').textContent = `👥 参与人数：${students.length} 人`;
+        }
+        
+        function renderAll() {
+            renderStudentList();
+            renderHistory();
+            renderCount();
+        }
+        
+        function clearHistory() {
+            history = [];
+            saveData();
+            renderHistory();
+        }
+        
+        // ========== 事件绑定 ==========
+        document.getElementById('speedRange').addEventListener('input', function() {
+            document.getElementById('speedLabel').textContent = this.value + 'ms';
+        });
+        
+        // 回车键添加学生
+        document.getElementById('studentName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') addStudent();
+        });
+        document.getElementById('studentWeight').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') addStudent();
+        });
+        
+        // ========== 启动 ==========
+        loadData();
+    </script>
+</body>
+</html>
