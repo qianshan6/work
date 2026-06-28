@@ -1,4 +1,4 @@
-import json
+import jso
 import os
 import random
 import tkinter as tk
