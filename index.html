@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 16px;
@@ -51,7 +51,7 @@
         .btn-lottery:disabled { opacity: 0.6; transform: scale(0.98); }
         
         .controls {
-            display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+            display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
         }
         .controls input {
             flex: 1; padding: 8px 12px; border: 2px solid #dfe6e9;
@@ -72,7 +72,7 @@
         
         .student-list {
             background: #f8f9fa; border-radius: 12px; padding: 10px;
-            margin-bottom: 12px; max-height: 200px; overflow-y: auto;
+            margin-bottom: 12px; max-height: 180px; overflow-y: auto;
         }
         .student-item {
             display: flex; justify-content: space-between; align-items: center;
@@ -125,7 +125,7 @@
         }
         .modal h3 { margin-bottom: 12px; color: #2d3436; }
         .modal textarea {
-            width: 100%; height: 200px; padding: 10px;
+            width: 100%; height: 160px; padding: 10px;
             border: 2px solid #dfe6e9; border-radius: 10px;
             font-size: 14px; font-family: monospace; resize: vertical;
         }
@@ -133,6 +133,14 @@
         .modal .modal-btns {
             display: flex; gap: 10px; margin-top: 12px; justify-content: flex-end;
         }
+        .modal .class-input {
+            display: flex; gap: 8px; margin-bottom: 12px;
+        }
+        .modal .class-input input {
+            flex: 1; padding: 8px 12px; border: 2px solid #dfe6e9;
+            border-radius: 10px; font-size: 14px;
+        }
+        .modal .class-input input:focus { outline: none; border-color: #667eea; }
         
         .tab-bar {
             display: flex; gap: 4px; margin-bottom: 12px;
@@ -148,6 +156,16 @@
         .section { display: none; }
         .section.active { display: block; }
         
+        .class-selector {
+            display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
+            background: #f0f0f0; border-radius: 12px; padding: 8px 12px;
+        }
+        .class-selector select {
+            flex: 1; padding: 6px 10px; border: none; border-radius: 8px;
+            font-size: 14px; background: white;
+        }
+        .class-selector select:focus { outline: none; }
+        
         @media (max-width: 480px) {
             .result-box .result-text { font-size: 26px; }
             .header h1 { font-size: 20px; }
@@ -159,7 +177,7 @@
     <div class="container" id="app">
         <div class="header">
             <h1>🎰 课堂随机抽奖器</h1>
-            <div class="subtitle">📚 权重抽奖 · 班级管理 · 批量导入</div>
+            <div class="subtitle">📚 多班级管理 · 权重抽奖 · 批量导入</div>
         </div>
         
         <!-- 抽奖结果 -->
@@ -175,6 +193,14 @@
             <label>⚡ 速度</label>
             <input type="range" id="speedRange" min="20" max="200" value="80">
             <span class="speed-label" id="speedLabel">80ms</span>
+        </div>
+        
+        <!-- 班级选择 -->
+        <div class="class-selector">
+            <span style="font-weight:500;font-size:14px;">🏫 班级</span>
+            <select id="classSelect" onchange="switchClass()"></select>
+            <button class="btn-small primary" onclick="showClassModal()">➕</button>
+            <button class="btn-small danger" onclick="deleteClass()">✖</button>
         </div>
         
         <!-- Tab 切换 -->
@@ -215,6 +241,20 @@
         </div>
     </div>
     
+    <!-- 班级管理弹窗 -->
+    <div class="modal-overlay" id="classModal">
+        <div class="modal">
+            <h3>🏫 新建班级</h3>
+            <div class="class-input">
+                <input type="text" id="newClassName" placeholder="输入班级名称" />
+            </div>
+            <div class="modal-btns">
+                <button class="btn-small" onclick="closeClassModal()">取消</button>
+                <button class="btn-small primary" onclick="createClass()">创建</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- 批量导入弹窗 -->
     <div class="modal-overlay" id="batchModal">
         <div class="modal">
@@ -231,6 +271,8 @@
 
     <script>
         // ========== 数据 ==========
+        let allClasses = {};  // { 班级名: { students: [], highProb: {}, history: [] } }
+        let currentClass = '默认班级';
         let students = [];
         let highProb = {};
         let normalWeight = 1;
@@ -240,27 +282,116 @@
         // ========== 存储 ==========
         function loadData() {
             try {
-                const saved = localStorage.getItem('lotteryData');
+                const saved = localStorage.getItem('lotteryAllClasses');
                 if (saved) {
-                    const data = JSON.parse(saved);
-                    students = data.students || [];
-                    highProb = data.highProb || {};
-                    normalWeight = data.normalWeight || 1;
-                    history = data.history || [];
+                    allClasses = JSON.parse(saved);
                 }
             } catch(e) {}
+            
+            if (Object.keys(allClasses).length === 0) {
+                allClasses = {
+                    '默认班级': {
+                        students: ['范留硕', '段硕', '黄廉体', '庹雅欣', '肖衔'],
+                        highProb: {'肖衔': 100, '段硕': 100},
+                        history: []
+                    }
+                };
+            }
+            
+            if (!allClasses[currentClass]) {
+                currentClass = Object.keys(allClasses)[0];
+            }
+            loadCurrentClass();
+            renderAll();
+            renderClassSelect();
+        }
+        
+        function saveAllData() {
+            try {
+                localStorage.setItem('lotteryAllClasses', JSON.stringify(allClasses));
+            } catch(e) {}
+        }
+        
+        function loadCurrentClass() {
+            const data = allClasses[currentClass];
+            students = data.students || [];
+            highProb = data.highProb || {};
+            history = data.history || [];
+            normalWeight = 1;
+        }
+        
+        function saveCurrentClass() {
+            allClasses[currentClass] = {
+                students: students,
+                highProb: highProb,
+                history: history
+            };
+            saveAllData();
+        }
+        
+        // ========== 班级管理 ==========
+        function renderClassSelect() {
+            const select = document.getElementById('classSelect');
+            select.innerHTML = Object.keys(allClasses).map(name => 
+                `<option value="${name}" ${name === currentClass ? 'selected' : ''}>${name}</option>`
+            ).join('');
+        }
+        
+        function switchClass() {
+            const select = document.getElementById('classSelect');
+            const newClass = select.value;
+            if (newClass === currentClass) return;
+            
+            // 保存当前班级
+            saveCurrentClass();
+            
+            currentClass = newClass;
+            loadCurrentClass();
             renderAll();
         }
         
-        function saveData() {
-            try {
-                localStorage.setItem('lotteryData', JSON.stringify({
-                    students, highProb, normalWeight, history
-                }));
-            } catch(e) {}
+        function showClassModal() {
+            document.getElementById('classModal').classList.add('active');
+            document.getElementById('newClassName').value = '';
+            document.getElementById('newClassName').focus();
         }
         
-        // ========== 核心功能 ==========
+        function closeClassModal() {
+            document.getElementById('classModal').classList.remove('active');
+        }
+        
+        function createClass() {
+            const name = document.getElementById('newClassName').value.trim();
+            if (!name) { alert('请输入班级名称'); return; }
+            if (allClasses[name]) { alert('班级已存在'); return; }
+            
+            allClasses[name] = { students: [], highProb: {}, history: [] };
+            currentClass = name;
+            students = [];
+            highProb = {};
+            history = [];
+            saveAllData();
+            renderClassSelect();
+            renderAll();
+            closeClassModal();
+        }
+        
+        function deleteClass() {
+            if (Object.keys(allClasses).length <= 1) {
+                alert('至少保留一个班级');
+                return;
+            }
+            if (!confirm(`确定删除 "${currentClass}" 吗？`)) return;
+            
+            delete allClasses[currentClass];
+            currentClass = Object.keys(allClasses)[0];
+            loadCurrentClass();
+            saveAllData();
+            renderClassSelect();
+            renderAll();
+        }
+        
+        // ========== 学生管理 ==========
         function getWeight(name) {
             return highProb[name] || normalWeight;
         }
@@ -280,7 +411,7 @@
             
             nameInput.value = '';
             weightInput.value = '1';
-            saveData();
+            saveCurrentClass();
             renderAll();
         }
         
@@ -288,14 +419,14 @@
             if (!confirm(`确定删除 "${name}" 吗？`)) return;
             students = students.filter(s => s !== name);
             delete highProb[name];
-            saveData();
+            saveCurrentClass();
             renderAll();
         }
         
         function resetWeights() {
             if (!confirm('确定将所有权重重置为 1 吗？')) return;
             highProb = {};
-            saveData();
+            saveCurrentClass();
             renderAll();
         }
         
@@ -303,7 +434,7 @@
             if (!confirm('确定清空所有学生吗？')) return;
             students = [];
             highProb = {};
-            saveData();
+            saveCurrentClass();
             renderAll();
         }
         
@@ -311,15 +442,15 @@
             if (students.length > 0 && !confirm('替换为示例数据？')) return;
             students = ['范留硕', '段硕', '黄廉体', '庹雅欣', '肖衔', '萧炎', '周健毅'];
             highProb = {'肖衔': 100, '段硕': 100, '萧炎': 1000};
-            normalWeight = 1;
             history = [];
-            saveData();
+            saveCurrentClass();
             renderAll();
         }
         
         // ========== 批量导入 ==========
         function showBatchImport() {
             document.getElementById('batchModal').classList.add('active');
+            document.getElementById('batchInput').value = '';
         }
         
         function closeBatchImport() {
@@ -344,8 +475,7 @@
             }
             
             closeBatchImport();
-            document.getElementById('batchInput').value = '';
-            saveData();
+            saveCurrentClass();
             renderAll();
             alert(`成功导入 ${count} 名学生`);
         }
@@ -385,7 +515,7 @@
                     document.getElementById('resultText').textContent = `🏆 ${winner} 🏆`;
                     history.unshift(winner);
                     if (history.length > 100) history = history.slice(0, 100);
-                    saveData();
+                    saveCurrentClass();
                     renderHistory();
                     btn.disabled = false;
                     btn.textContent = '🎯 开始抽奖';
@@ -439,18 +569,19 @@
         }
         
         function renderCount() {
-            document.getElementById('countInfo').textContent = `👥 参与人数：${students.length} 人`;
+            document.getElementById('countInfo').textContent = `👥 ${currentClass} · ${students.length} 人`;
         }
         
         function renderAll() {
             renderStudentList();
             renderHistory();
             renderCount();
+            renderClassSelect();
         }
         
         function clearHistory() {
             history = [];
-            saveData();
+            saveCurrentClass();
             renderHistory();
         }
         
@@ -466,9 +597,11 @@
             if (e.key === 'Enter') addStudent();
         });
         
-        // 点击模态框外部关闭
         document.getElementById('batchModal').addEventListener('click', function(e) {
             if (e.target === this) closeBatchImport();
+        });
+        document.getElementById('classModal').addEventListener('click', function(e) {
+            if (e.target === this) closeClassModal();
         });
         
         // ========== 启动 ==========
